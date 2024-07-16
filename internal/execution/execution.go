@@ -9,6 +9,7 @@ import (
 
 	"github.com/zitadel/logging"
 
+	zhttp "github.com/zitadel/zitadel/internal/api/http"
 	"github.com/zitadel/zitadel/internal/domain"
 	"github.com/zitadel/zitadel/internal/telemetry/tracing"
 	"github.com/zitadel/zitadel/internal/zerrors"
@@ -114,9 +115,17 @@ func call(ctx context.Context, url string, timeout time.Duration, body []byte) (
 	}
 	defer resp.Body.Close()
 
+	return handleResponse(resp)
+}
+
+func handleResponse(resp *http.Response) ([]byte, error) {
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
 	// Check for success between 200 and 299, redirect 300 to 399 is handled by the client, return error with statusCode >= 400
 	if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
-		return io.ReadAll(resp.Body)
+		return data, nil
 	}
-	return nil, zerrors.ThrowUnknown(nil, "EXEC-dra6yamk98", "Errors.Execution.Failed")
+	return nil, zhttp.HTTPStatusCodeToZitadelError(resp.StatusCode, "EXEC-dra6yamk98", string(data))
 }
